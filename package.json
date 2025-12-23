@@ -52,7 +52,7 @@
       "target": [
         "portable"
       ],
-      "icon": "favicon.ico"
+      "icon": "favicon.ico" 
     },
     "files": [
       "dist/**/*",
