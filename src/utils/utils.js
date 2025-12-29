@@ -61,3 +61,7 @@ export const DEFAULT_SETTINGS = {
   backgroundColor: 'transparent',
   renderMode: 'fill'
 };
+
+export const LARGE_BLOCK_THRESHOLD = 1500; 
+export const LARGE_BLOCK_PAGE_SIZE = 1000;
+export const ERROR_VIEW_PAGE_SIZE = 1000;

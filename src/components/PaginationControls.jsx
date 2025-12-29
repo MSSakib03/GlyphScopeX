@@ -16,7 +16,7 @@ const PaginationControls = ({ currentPage, setCurrentPage, totalPages }) => {
                Page <span className="font-bold text-violet-600">{currentPage}</span> of {totalPages}
            </div>
            <Button variant="secondary" size="sm" onClick={() => setCurrentPage(p => Math.min(totalPages, p+1))} disabled={currentPage === totalPages}>
-               Next <ChevronRight size={16} />
+               <ChevronRight size={16} /> Next
            </Button>
            <Button variant="ghost" size="icon" onClick={() => setCurrentPage(totalPages)} disabled={currentPage === totalPages} title="Last Page">
                <SkipForward size={16} />

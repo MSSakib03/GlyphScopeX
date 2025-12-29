@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { 
   Upload, Moon, Sun, Download, ChevronLeft, X, 
   Type, Trash2, AlertTriangle, Undo2, Redo2, RotateCcw, 
-  Loader2, Search
+  Loader2, Search, CheckSquare
 } from 'lucide-react';
 import opentype from 'opentype.js';
 import JSZip from 'jszip';
@@ -16,11 +16,11 @@ import PaginationControls from './components/PaginationControls';
 import { Button, AppLogo } from './components/UIComponents';
 
 // Import Utils
-import { cn, svgToPng, PRESETS, DEFAULT_SETTINGS, formatRange } from './utils/utils';
+import { cn, svgToPng, PRESETS, DEFAULT_SETTINGS, formatRange, LARGE_BLOCK_THRESHOLD, LARGE_BLOCK_PAGE_SIZE, ERROR_VIEW_PAGE_SIZE } from './utils/utils';
 
 // Import Data
 import { UNICODE_BLOCKS } from './blocks';
-import { UNICODE_NAMES } from './unicodeNames'; 
+import { UNICODE_NAMES } from './unicodeNames';
 
 export default function GlyphForge() {
   const [fontList, setFontList] = useState([]); 
@@ -59,7 +59,6 @@ export default function GlyphForge() {
   const scanCancelRef = useRef(false);
 
   const [currentPage, setCurrentPage] = useState(1);
-  const GLYPHS_PER_PAGE_TARGET = 600; 
   
   const [exportFormat, setExportFormat] = useState('svg'); 
   const [pngScale, setPngScale] = useState(1); 
@@ -77,6 +76,17 @@ export default function GlyphForge() {
 
   const [globalSettings, setGlobalSettings] = useState(DEFAULT_SETTINGS);
   const [overrides, setOverrides] = useState({});
+
+  // --- FLOATING BAR STATE ---
+  const [floatingPos, setFloatingPos] = useState(null);
+  const [isFloatingDragging, setIsFloatingDragging] = useState(false);
+  const [floatingOffset, setFloatingOffset] = useState({ x: 0, y: 0 });
+
+  // --- REFS FOR OPTIMIZATION ---
+  const overridesRef = useRef(overrides);
+  useEffect(() => {
+      overridesRef.current = overrides;
+  }, [overrides]);
 
   useEffect(() => {
     if (darkMode) document.documentElement.classList.add('dark');
@@ -196,7 +206,7 @@ export default function GlyphForge() {
         let offset = 0;
 
         while (offset < glyphsInBlock.length) {
-            const spaceLeft = GLYPHS_PER_PAGE_TARGET - currentCount;
+            const spaceLeft = LARGE_BLOCK_PAGE_SIZE - currentCount;
             if (spaceLeft <= 0) {
                 pages.push(currentPageContent);
                 currentPageContent = [];
@@ -224,12 +234,58 @@ export default function GlyphForge() {
     return pages;
   }, [blocks]);
 
-  useEffect(() => {
-    if (!font || glyphs.length === 0) return;
-    const timer = setTimeout(() => { startGlobalScan(); }, 1000); 
-    scanCancelRef.current = true; 
+  const checkClip = useCallback((g, explicitOverrides = null) => {
+      if (filterMode === 'unicode' && !g.unicode) return false;
+      
+      const currentOverrides = explicitOverrides || overridesRef.current;
+      const s = currentOverrides[g.index] || globalSettings;
+      
+      if (!g.glyph.path || g.glyph.path.commands.length === 0) return false;
+      
+      const padFactor = 1 - (s.padding / 100);
+      const baseSize = Math.min(s.canvasWidth, s.canvasHeight) * padFactor;
+      const scaledFontSize = baseSize * s.scale;
+      
+      const measurePath = g.glyph.getPath(0, 0, scaledFontSize);
+      const mBbox = measurePath.getBoundingBox();
+      const gWidth = mBbox.x2 - mBbox.x1;
+      const xPos = (s.canvasWidth / 2) + s.translateX - (gWidth / 2) - mBbox.x1;
+      
+      let yPos;
+      if (s.positioning === 'center') {
+        const gHeight = mBbox.y2 - mBbox.y1;
+        yPos = (s.canvasHeight / 2) + s.translateY + (gHeight / 2) - mBbox.y2;
+      } else if (s.positioning === 'metrics' && g.fontMetrics) {
+        const totalHeight = g.fontMetrics.ascender - g.fontMetrics.descender;
+        const baselineRatio = g.fontMetrics.ascender / totalHeight;
+        const availableHeight = s.canvasHeight * padFactor;
+        const baselineY = (s.canvasHeight - availableHeight) / 2 + (availableHeight * baselineRatio);
+        yPos = baselineY + s.translateY;
+      } else {
+        const baselineY = s.canvasHeight * 0.65;
+        yPos = baselineY + s.translateY;
+      }
 
-    const startGlobalScan = async () => {
+      const finalPath = g.glyph.getPath(xPos, yPos, scaledFontSize);
+      const bbox = finalPath.getBoundingBox();
+      const TOLERANCE = 0.1;
+      return bbox.x1 < -TOLERANCE || bbox.y1 < -TOLERANCE || bbox.x2 > (s.canvasWidth + TOLERANCE) || bbox.y2 > (s.canvasHeight + TOLERANCE);
+  }, [filterMode, globalSettings]);
+
+  const performScan = useCallback(async (targets = null, explicitOverrides = null) => {
+       if (targets && Array.isArray(targets)) {
+          setErrorIndices(prevErrors => {
+              const newErrors = new Set(prevErrors);
+              targets.forEach(g => {
+                  const isClipped = checkClip(g, explicitOverrides);
+                  if (isClipped) newErrors.add(g.index);
+                  else newErrors.delete(g.index);
+              });
+              return newErrors;
+          });
+          return;
+       }
+
        scanCancelRef.current = false; 
        setIsScanning(true);
        setScanProgress(0);
@@ -237,56 +293,25 @@ export default function GlyphForge() {
        const total = glyphs.length;
        const newErrors = new Set();
        
-       const checkClip = (g) => {
-          if (filterMode === 'unicode' && !g.unicode) return false;
-
-          const s = overrides[g.index] || globalSettings;
-          if (!g.glyph.path || g.glyph.path.commands.length === 0) return false;
-          
-          const padFactor = 1 - (s.padding / 100);
-          const baseSize = Math.min(s.canvasWidth, s.canvasHeight) * padFactor;
-          const scaledFontSize = baseSize * s.scale;
-          
-          const measurePath = g.glyph.getPath(0, 0, scaledFontSize);
-          const mBbox = measurePath.getBoundingBox();
-          const gWidth = mBbox.x2 - mBbox.x1;
-          const xPos = (s.canvasWidth / 2) + s.translateX - (gWidth / 2) - mBbox.x1;
-          
-          let yPos;
-          if (s.positioning === 'center') {
-            const gHeight = mBbox.y2 - mBbox.y1;
-            yPos = (s.canvasHeight / 2) + s.translateY + (gHeight / 2) - mBbox.y2;
-          } else if (s.positioning === 'metrics' && g.fontMetrics) {
-            const totalHeight = g.fontMetrics.ascender - g.fontMetrics.descender;
-            const baselineRatio = g.fontMetrics.ascender / totalHeight;
-            const availableHeight = s.canvasHeight * padFactor;
-            const baselineY = (s.canvasHeight - availableHeight) / 2 + (availableHeight * baselineRatio);
-            yPos = baselineY + s.translateY;
-          } else {
-            const baselineY = s.canvasHeight * 0.65;
-            yPos = baselineY + s.translateY;
-          }
-
-          const finalPath = g.glyph.getPath(xPos, yPos, scaledFontSize);
-          const bbox = finalPath.getBoundingBox();
-          const TOLERANCE = 0.1;
-          return bbox.x1 < -TOLERANCE || bbox.y1 < -TOLERANCE || bbox.x2 > (s.canvasWidth + TOLERANCE) || bbox.y2 > (s.canvasHeight + TOLERANCE);
-       };
-
        for (let i = 0; i < total; i += BATCH_SIZE) {
           if (scanCancelRef.current) { setIsScanning(false); return; }
           const end = Math.min(i + BATCH_SIZE, total);
           for (let j = i; j < end; j++) {
-             if (checkClip(glyphs[j])) newErrors.add(glyphs[j].index);
+             if (checkClip(glyphs[j], explicitOverrides)) newErrors.add(glyphs[j].index);
           }
           setScanProgress(Math.round((end / total) * 100));
           await new Promise(resolve => setTimeout(resolve, 0));
        }
        setErrorIndices(newErrors);
        setIsScanning(false);
-    };
+  }, [glyphs, checkClip]); 
+
+  useEffect(() => {
+    if (!font || glyphs.length === 0) return;
+    const timer = setTimeout(() => { performScan(null); }, 500); 
+    scanCancelRef.current = true; 
     return () => { clearTimeout(timer); scanCancelRef.current = true; };
-  }, [globalSettings, overrides, font, glyphs, filterMode]);
+  }, [globalSettings, font, glyphs, filterMode, performScan]); 
 
   const handleDragOver = useCallback((e) => {
     e.preventDefault(); e.stopPropagation(); 
@@ -329,7 +354,6 @@ export default function GlyphForge() {
                 for (let i = 0; i < parsedFont.glyphs.length; i++) {
                     const glyph = parsedFont.glyphs.get(i);
                     const hexStr = glyph.unicode ? glyph.unicode.toString(16).toUpperCase().padStart(4, '0') : null;
-                    
                     const unicodeName = (hexStr && UNICODE_NAMES[hexStr]) ? UNICODE_NAMES[hexStr] : (glyph.name || 'Private Use');
 
                     glyphList.push({ 
@@ -396,8 +420,27 @@ export default function GlyphForge() {
 
   const getVisibleGlyphs = useCallback(() => {
     if (!font) return [];
-    if (viewMode === 'errors') return glyphs.filter(g => errorIndices.has(g.index));
-    if (viewMode === 'block' && activeBlock) return activeBlock.glyphs;
+    
+    if (viewMode === 'errors') {
+        const errorGlyphs = glyphs.filter(g => errorIndices.has(g.index));
+        if (errorGlyphs.length > ERROR_VIEW_PAGE_SIZE) {
+            const start = (currentPage - 1) * ERROR_VIEW_PAGE_SIZE;
+            const end = start + ERROR_VIEW_PAGE_SIZE;
+            return errorGlyphs.slice(start, end);
+        }
+        return errorGlyphs;
+    }
+    
+    if (viewMode === 'block' && activeBlock) {
+       const totalGlyphs = activeBlock.glyphs.length;
+       if (totalGlyphs > LARGE_BLOCK_THRESHOLD) {
+           const start = (currentPage - 1) * LARGE_BLOCK_PAGE_SIZE;
+           const end = start + LARGE_BLOCK_PAGE_SIZE;
+           return activeBlock.glyphs.slice(start, end);
+       }
+       return activeBlock.glyphs;
+    }
+
     if (paginatedBlocks.length > 0) {
         const currentBlocks = paginatedBlocks[currentPage - 1];
         if (currentBlocks) return currentBlocks.flatMap(b => b.glyphs);
@@ -432,12 +475,22 @@ export default function GlyphForge() {
 
   const handleDeleteGlyphs = (indicesToDelete) => {
     if (!window.confirm(`Are you sure you want to remove ${indicesToDelete.size} glyphs?`)) return;
+    
+    scanCancelRef.current = true;
+
     const currentFontData = fontList[activeFontIndex];
     const newGlyphs = currentFontData.glyphs.filter(g => !indicesToDelete.has(g.index));
     const newList = [...fontList];
     newList[activeFontIndex] = { ...currentFontData, glyphs: newGlyphs };
     setFontList(newList);
     setSelectedIndices(new Set());
+
+    setErrorIndices(prev => {
+        const newSet = new Set(prev);
+        indicesToDelete.forEach(idx => newSet.delete(idx));
+        return newSet;
+    });
+
     if (activeBlock) {
        const blockStillExists = newGlyphs.some(g => activeBlock.glyphs.includes(g)); 
        if (!blockStillExists) setViewMode('all');
@@ -447,21 +500,21 @@ export default function GlyphForge() {
   const deleteBlock = (block) => {
     if (!window.confirm(`Delete entire block "${block.name}"?`)) return;
     const indicesToRemove = new Set(block.glyphs.map(g => g.index));
-    const currentFontData = fontList[activeFontIndex];
-    const newGlyphs = currentFontData.glyphs.filter(g => !indicesToRemove.has(g.index));
-    const newList = [...fontList];
-    newList[activeFontIndex] = { ...currentFontData, glyphs: newGlyphs };
-    setFontList(newList);
+    handleDeleteGlyphs(indicesToRemove); 
     if (activeBlock === block) setViewMode('all');
   };
 
   const updateSetting = (key, value) => {
     if (selectedIndices.size > 0) {
       const newOverrides = { ...overrides };
+      const selectedGlyphs = [];
       selectedIndices.forEach(idx => {
         newOverrides[idx] = { ...(newOverrides[idx] || globalSettings), [key]: value };
+        const g = glyphs.find(item => item.index === idx);
+        if(g) selectedGlyphs.push(g);
       });
       setOverrides(newOverrides);
+      performScan(selectedGlyphs, newOverrides);
     } else {
       setGlobalSettings(prev => ({ ...prev, [key]: value }));
     }
@@ -472,11 +525,16 @@ export default function GlyphForge() {
   };
 
   const handleUpdateGlyphPos = useCallback((index, tx, ty) => {
-     setOverrides(prev => ({
-        ...prev,
-        [index]: { ...(prev[index] || globalSettings), translateX: tx, translateY: ty }
-     }));
-  }, [globalSettings]);
+     setOverrides(prev => {
+        const newOverrides = {
+            ...prev,
+            [index]: { ...(prev[index] || globalSettings), translateX: tx, translateY: ty }
+        };
+        const g = glyphs.find(item => item.index === index);
+        if (g) performScan([g], newOverrides);
+        return newOverrides;
+     });
+  }, [globalSettings, glyphs, performScan]);
 
   const handleDragEnd = useCallback(() => {
       saveToHistory(globalSettings, overrides);
@@ -543,6 +601,7 @@ export default function GlyphForge() {
         };
     });
     setOverrides(newOverrides);
+    performScan(targets, newOverrides);
     saveToHistory(globalSettings, newOverrides);
   };
 
@@ -619,7 +678,7 @@ export default function GlyphForge() {
       else targets = filteredGlyphs; 
  
       if (scope === 'all') targets = glyphs; 
- 
+
       // --- DYNAMIC FOLDER NAME LOGIC ---
       const currentFont = fontList[activeFontIndex];
       const fontName = currentFont ? currentFont.name.replace(/\s+/g, '_') : 'font';
@@ -670,6 +729,52 @@ export default function GlyphForge() {
   };
 
   const currentSettings = selectedIndices.size > 0 ? (overrides[Array.from(selectedIndices)[0]] || globalSettings) : globalSettings;
+
+  // --- FLOATING BAR HANDLERS ---
+  const handleFloatingPointerDown = (e) => {
+      e.preventDefault();
+      e.stopPropagation(); // prevent other drag events
+      const element = e.currentTarget;
+      element.setPointerCapture(e.pointerId);
+      const rect = element.getBoundingClientRect();
+      
+      // We need coordinates relative to the offsetParent (main)
+      const parentRect = element.offsetParent.getBoundingClientRect();
+      
+      const currentLeft = rect.left - parentRect.left;
+      const currentTop = rect.top - parentRect.top;
+      
+      setFloatingPos({ x: currentLeft, y: currentTop });
+      setFloatingOffset({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+      setIsFloatingDragging(true);
+  };
+
+  const handleFloatingPointerMove = (e) => {
+      if (!isFloatingDragging) return;
+      e.preventDefault();
+      const parentRect = e.currentTarget.offsetParent.getBoundingClientRect();
+      setFloatingPos({
+          x: e.clientX - parentRect.left - floatingOffset.x,
+          y: e.clientY - parentRect.top - floatingOffset.y
+      });
+  };
+
+  const handleFloatingPointerUp = (e) => {
+      setIsFloatingDragging(false);
+      e.currentTarget.releasePointerCapture(e.pointerId);
+  };
+
+  // --- Calculate Total Pages for PaginationControls ---
+  const calculateTotalPages = () => {
+    if (viewMode === 'all') return paginatedBlocks.length;
+    if (viewMode === 'block' && activeBlock && activeBlock.glyphs.length > LARGE_BLOCK_THRESHOLD) {
+        return Math.ceil(activeBlock.glyphs.length / LARGE_BLOCK_PAGE_SIZE);
+    }
+    if (viewMode === 'errors' && errorIndices.size > ERROR_VIEW_PAGE_SIZE) {
+        return Math.ceil(errorIndices.size / ERROR_VIEW_PAGE_SIZE);
+    }
+    return 0;
+  };
 
   return (
     <div 
@@ -728,10 +833,13 @@ export default function GlyphForge() {
         setActiveBlock={setActiveBlock}
         paginatedBlocks={paginatedBlocks}
         currentPage={currentPage}
+        setCurrentPage={setCurrentPage}
         setViewMode={setViewMode}
         errorIndices={errorIndices}
         handleDownload={handleDownload}
         deleteBlock={deleteBlock}
+        selectedIndices={selectedIndices}
+        setSelectedIndices={setSelectedIndices}
       />
 
       {/* --- Main Content --- */}
@@ -760,7 +868,11 @@ export default function GlyphForge() {
 
              {errorIndices.size > 0 && (
                <button 
-                 onClick={() => setViewMode(viewMode === 'errors' ? 'all' : 'errors')}
+                 onClick={() => {
+                     // Reset to page 1 when opening errors
+                     setCurrentPage(1);
+                     setViewMode(viewMode === 'errors' ? 'all' : 'errors');
+                 }}
                  className={cn("flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold border transition-colors", viewMode === 'errors' ? "bg-red-600 text-white border-red-600" : "bg-red-50 text-red-600 border-red-200 hover:bg-red-100")}
                >
                  <AlertTriangle size={14} /> {errorIndices.size} Clipping
@@ -809,10 +921,50 @@ export default function GlyphForge() {
                {(viewMode === 'block' || viewMode === 'errors') && (
                  <div>
                      <div className="mb-6 flex items-center justify-between">
-                        <h2 className="text-xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
-                           {viewMode === 'errors' ? <span className="text-red-500 flex items-center gap-2"><AlertTriangle/> Clipping Errors</span> : <span>{activeBlock?.name}</span>}
-                        </h2>
-                        {viewMode === 'block' && <span className="text-sm text-gray-500 font-mono">{formatRange(activeBlock.originalStart || activeBlock.start, activeBlock.originalEnd || activeBlock.end)}</span>}
+                        <div className="flex items-center gap-4">
+                            <h2 className="text-xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
+                               {viewMode === 'errors' ? <span className="text-red-500 flex items-center gap-2"><AlertTriangle/> Clipping Errors</span> : <span>{activeBlock?.name}</span>}
+                            </h2>
+
+                            {/* --- NEW SELECTION BUTTONS FOR ERROR VIEW --- */}
+                            {viewMode === 'errors' && (
+                                <div className="flex items-center gap-2 ml-4 border-l pl-4 border-gray-300 dark:border-gray-700">
+                                    <Button variant="ghost" size="xs" onClick={() => {
+                                        const visible = getVisibleGlyphs();
+                                        const newSet = new Set(selectedIndices);
+                                        visible.forEach(g => newSet.add(g.index));
+                                        setSelectedIndices(newSet);
+                                    }} title="Select all on this page">
+                                        <CheckSquare size={14}/> Select Page
+                                    </Button>
+                                    <Button variant="ghost" size="xs" onClick={() => {
+                                        const newSet = new Set(selectedIndices);
+                                        errorIndices.forEach(idx => newSet.add(idx));
+                                        setSelectedIndices(newSet);
+                                    }} title="Select all errors">
+                                        <CheckSquare size={14}/> Select All ({errorIndices.size})
+                                    </Button>
+                                </div>
+                            )}
+                        </div>
+                        
+                        {/* Pagination Status Text for Errors */}
+                        {viewMode === 'errors' && errorIndices.size > ERROR_VIEW_PAGE_SIZE && (
+                             <span className="text-sm text-gray-500 font-mono">
+                                 <span className="ml-2 bg-red-100 text-red-700 px-2 py-0.5 rounded text-xs">
+                                     Showing {(currentPage - 1) * ERROR_VIEW_PAGE_SIZE + 1} - {Math.min(currentPage * ERROR_VIEW_PAGE_SIZE, errorIndices.size)} of {errorIndices.size} Errors
+                                 </span>
+                             </span>
+                        )}
+
+                        {viewMode === 'block' && <span className="text-sm text-gray-500 font-mono">
+                            {formatRange(activeBlock.originalStart || activeBlock.start, activeBlock.originalEnd || activeBlock.end)} 
+                            {activeBlock.glyphs.length > LARGE_BLOCK_THRESHOLD && (
+                                <span className="ml-2 bg-violet-100 text-violet-700 px-2 py-0.5 rounded text-xs">
+                                    Showing {(currentPage - 1) * LARGE_BLOCK_PAGE_SIZE + 1} - {Math.min(currentPage * LARGE_BLOCK_PAGE_SIZE, activeBlock.glyphs.length)} of {activeBlock.glyphs.length}
+                                </span>
+                            )}
+                        </span>}
                      </div>
                      <div className="grid gap-4 grid-cols-[repeat(auto-fill,minmax(120px,1fr))] pb-32">
                         {getVisibleGlyphs().map(g => (
@@ -835,21 +987,22 @@ export default function GlyphForge() {
                  <div className="pb-32 min-h-full">
                      {paginatedBlocks[currentPage - 1]?.map((block, idx) => (
                         <BlockSection 
-                            key={`${currentPage}-${idx}`} 
-                            block={block} 
-                            collapsedBlocks={collapsedBlocks}
-                            setCollapsedBlocks={setCollapsedBlocks}
-                            errorIndices={errorIndices}
-                            selectedIndices={selectedIndices}
-                            setSelectedIndices={setSelectedIndices}
-                            deleteBlock={deleteBlock}
-                            handleDownload={handleDownload}
-                            setViewMode={setViewMode}
-                            setActiveBlock={setActiveBlock}
-                            getSettingsForGlyph={getSettingsForGlyph}
-                            toggleSelection={toggleSelection}
-                            handleUpdateGlyphPos={handleUpdateGlyphPos}
-                            handleDragEnd={handleDragEnd}
+                           key={`${currentPage}-${idx}`} 
+                           block={block} 
+                           collapsedBlocks={collapsedBlocks} 
+                           setCollapsedBlocks={setCollapsedBlocks} 
+                           errorIndices={errorIndices} 
+                           selectedIndices={selectedIndices} 
+                           setSelectedIndices={setSelectedIndices} 
+                           deleteBlock={deleteBlock} 
+                           handleDownload={handleDownload} 
+                           setViewMode={setViewMode} 
+                           setActiveBlock={setActiveBlock} 
+                           getSettingsForGlyph={getSettingsForGlyph} 
+                           toggleSelection={toggleSelection} 
+                           handleUpdateGlyphPos={handleUpdateGlyphPos} 
+                           handleDragEnd={handleDragEnd}
+                           setCurrentPage={setCurrentPage}
                         />
                      ))}
                      {paginatedBlocks.length === 0 && <div className="text-gray-500 text-center mt-20">No glyphs found matching your search.</div>}
@@ -859,7 +1012,13 @@ export default function GlyphForge() {
            )}
         </div>
 
-        {font && viewMode === 'all' && <PaginationControls currentPage={currentPage} setCurrentPage={setCurrentPage} totalPages={paginatedBlocks.length} />}
+        {font && (
+            <PaginationControls 
+                currentPage={currentPage} 
+                setCurrentPage={setCurrentPage} 
+                totalPages={calculateTotalPages()}
+            />
+        )}
 
         {isScanning && (
            <div className="fixed bottom-20 right-8 z-50 bg-gray-900 text-white px-4 py-3 rounded-lg shadow-xl flex items-center gap-3 border border-gray-700 animate-in slide-in-from-bottom-5">
@@ -872,7 +1031,16 @@ export default function GlyphForge() {
         )}
 
         {selectedIndices.size > 0 && (
-          <div className="absolute top-6 left-1/2 -translate-x-1/2 z-50 bg-gray-900 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-6 animate-in slide-in-from-top-4 border border-gray-700">
+          <div 
+            onPointerDown={handleFloatingPointerDown}
+            onPointerMove={handleFloatingPointerMove}
+            onPointerUp={handleFloatingPointerUp}
+            style={floatingPos ? { left: floatingPos.x, top: floatingPos.y, transform: 'none' } : {}}
+            className={cn(
+               "absolute z-50 bg-gray-900 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-6 animate-in slide-in-from-top-4 border border-gray-700 cursor-move touch-none select-none",
+               !floatingPos && "top-10 left-1/2 -translate-x-1/2" 
+            )}
+          >
              <div className="font-semibold text-sm flex items-center gap-2">
                 <span className="bg-violet-500 text-xs px-2 py-0.5 rounded-full">{selectedIndices.size}</span>
                 <span>Selected</span>
@@ -887,7 +1055,7 @@ export default function GlyphForge() {
                 <Trash2 size={16} /> <span className="hidden sm:inline">Remove</span>
              </button>
              
-             <button
+             <button 
                onClick={deselectAllGlyphs}
                className="flex items-center gap-2 text-sm hover:text-orange-400 transition-colors border-l pl-4 border-gray-700"
                title="Deselect all (Esc)"

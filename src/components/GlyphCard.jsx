@@ -122,10 +122,10 @@ const GlyphCard = React.memo(({ g, settings, isSelected, isError, toggleSelectio
                   <path 
                     d={d} 
                     fill={fill} 
-                    stroke={strokeClr}
+                    stroke={strokeClr} 
                     strokeWidth={stroke}
-                    paintOrder="stroke"
-                    strokeLinejoin="round"
+                    paintOrder="stroke" 
+                    strokeLinejoin="round" 
                   />
                 ) : <text x="50%" y="50%" textAnchor="middle" fill="#ccc" fontSize="20">?</text>}
               </g>

@@ -1,5 +1,5 @@
 import React from 'react';
-import { PanelLeftClose, PanelLeftOpen, Upload, FileType, X, Download, Layers, AlignEndHorizontal, AlignVerticalJustifyCenter, Baseline, Maximize, MoveHorizontal, MoveVertical, Palette, FileSignature, Grid, LayoutGrid, Eye, Trash2 } from 'lucide-react';
+import { PanelLeftClose, PanelLeftOpen, Upload, FileType, X, Download, Layers, AlignEndHorizontal, AlignVerticalJustifyCenter, Baseline, Maximize, MoveHorizontal, MoveVertical, Palette, FileSignature, Grid, LayoutGrid, Eye, Trash2, CheckSquare, Square } from 'lucide-react';
 import { cn, PRESETS, formatRange } from '../utils/utils';
 import { Button, SliderControl, AppLogo } from './UIComponents';
 
@@ -8,7 +8,8 @@ const Sidebar = ({
   font, exportFormat, setExportFormat, pngScale, setPngScale, preset, setPreset,
   currentSettings, updateSetting, commitSettingChange, performAutoFit,
   filenamePattern, setFilenamePattern, ligaturePattern, setLigaturePattern, filterMode, handleModeSwitch,
-  blocks, activeBlock, setActiveBlock, paginatedBlocks, currentPage, setViewMode, errorIndices, handleDownload, deleteBlock
+  blocks, activeBlock, setActiveBlock, paginatedBlocks, currentPage, setCurrentPage, setViewMode, 
+  errorIndices, handleDownload, deleteBlock, selectedIndices, setSelectedIndices
 }) => {
   return (
     <aside className={cn(
@@ -93,13 +94,13 @@ const Sidebar = ({
                     <span className="text-xs text-gray-500">PNG Size:</span>
                     <div className="flex gap-1">
                       {[1, 2, 4].map(scale => (
-                         <button 
+                          <button 
                            key={scale} 
                            onClick={() => setPngScale(scale)}
                            className={cn("px-2 py-0.5 text-[10px] font-bold rounded border transition-colors", pngScale === scale ? "bg-violet-100 text-violet-700 border-violet-200" : "bg-white text-gray-500 border-gray-200")}
-                         >
-                           {scale}x
-                         </button>
+                          >
+                            {scale}x
+                          </button>
                       ))}
                     </div>
                  </div>
@@ -262,7 +263,9 @@ const Sidebar = ({
                  <span className="bg-gray-100 dark:bg-gray-800 text-gray-600 px-1.5 rounded text-[10px]">{blocks.length}</span>
                </label>
                <div className="space-y-1">
-                   {paginatedBlocks[currentPage - 1]?.map((block, idx) => (
+                   {blocks.map((block, idx) => {
+                     const isAllSelected = block.glyphs.every(g => selectedIndices.has(g.index));
+                     return (
                      <div key={idx} className={cn("group flex flex-col p-2 rounded-lg border transition-all", activeBlock === block ? "bg-violet-50 border-violet-200 dark:bg-violet-900/20 dark:border-violet-800" : "bg-white border-transparent hover:border-gray-200 dark:bg-gray-800/50 dark:hover:border-gray-700")}>
                         <div className="flex justify-between items-start mb-1">
                            <div>
@@ -274,8 +277,26 @@ const Sidebar = ({
                         
                         {/* --- SIDEBAR PANEL ICONS --- */}
                         <div className="flex items-center gap-1 mt-1 opacity-40 group-hover:opacity-100 transition-opacity">
-                           <button onClick={() => { setViewMode('block'); setActiveBlock(block); }} title="View Only This Block" className="p-1 hover:bg-violet-100 dark:hover:bg-violet-800 rounded text-violet-600"><Eye size={14}/></button>
+                           <button onClick={() => { setViewMode('block'); setActiveBlock(block); setCurrentPage(1); }} title="View Only This Block" className="p-1 hover:bg-violet-100 dark:hover:bg-violet-800 rounded text-violet-600"><Eye size={14}/></button>
                            
+                           {/* --- SELECT BLOCK BUTTON --- */}
+                           <button 
+                              onClick={(e) => {
+                                  e.stopPropagation();
+                                  const newSet = new Set(selectedIndices);
+                                  if (isAllSelected) {
+                                      block.glyphs.forEach(g => newSet.delete(g.index));
+                                  } else {
+                                      block.glyphs.forEach(g => newSet.add(g.index));
+                                  }
+                                  setSelectedIndices(newSet);
+                              }}
+                              title={isAllSelected ? "Deselect Block" : "Select Block"}
+                              className={cn("p-1 rounded transition-colors", isAllSelected ? "text-violet-600 hover:bg-violet-100 dark:hover:bg-violet-900" : "text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700")}
+                           >
+                              {isAllSelected ? <CheckSquare size={14} /> : <Square size={14} />}
+                           </button>
+
                            {/* --- TRASH & DOWNLOAD ICONS --- */}
                            <div className="ml-auto flex items-center gap-1">
                               <button onClick={() => deleteBlock(block)} title="Delete Block" className="p-1 hover:bg-red-100 dark:hover:bg-red-900 rounded text-red-500"><Trash2 size={14}/></button>
@@ -283,12 +304,7 @@ const Sidebar = ({
                            </div>
                         </div>
                      </div>
-                   ))}
-                   {paginatedBlocks.length > 1 && (
-                       <div className="text-center text-xs text-gray-400 pt-2">
-                           Showing Page {currentPage} of {paginatedBlocks.length}
-                       </div>
-                   )}
+                   )})}
                </div>
              </div>
           )}
