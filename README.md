@@ -16,8 +16,9 @@ You can use GlyphForge as a standalone desktop application or run it in your bro
 ### 📥 Option 1: Download Desktop App (Recommended)
 
 1. Go to the **Releases Page**: https://github.com/MSSakib03/glyphforge/releases/latest
-2. Download the latest `.exe` file.
-3. Run the application directly on your Windows machine.
+2. Download and Extract the`GlyphForge-v1.0.1-win-x64.zip`.
+3. Run `GlyphForge.exe`.
+4. Run the application directly on your Windows machine.
 
 ---
 
