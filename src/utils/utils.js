@@ -1,5 +1,6 @@
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import opentype from 'opentype.js';
 
 // --- Utility ---
 export function cn(...inputs) { return twMerge(clsx(inputs)); }
@@ -10,7 +11,6 @@ export const formatRange = (start, end) => {
   return `${toHex(start)} – ${toHex(end)}`;
 };
 
-// --- Helper: Convert SVG String to PNG Blob ---
 export const svgToPng = (svgString, width, height, scaleFactor = 1) => {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -35,17 +35,92 @@ export const svgToPng = (svgString, width, height, scaleFactor = 1) => {
         URL.revokeObjectURL(url);
       }
     };
-    
-    img.onerror = (e) => {
-      URL.revokeObjectURL(url);
-      reject(e);
-    };
-    
+    img.onerror = (e) => { URL.revokeObjectURL(url); reject(e); };
     img.src = url;
   });
 };
 
-// --- Constants ---
+// --- SPRITE SHEET GENERATOR (Smart Selection Logic) ---
+export const generateSpriteSheet = async (glyphs, settings, font) => {
+    const CELL_SIZE = 64; 
+    const COLS = Math.ceil(Math.sqrt(glyphs.length));
+    const ROWS = Math.ceil(glyphs.length / COLS);
+    const width = COLS * CELL_SIZE;
+    const height = ROWS * CELL_SIZE;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+
+    const metaData = {};
+    if (settings.backgroundColor !== 'transparent') {
+        ctx.fillStyle = settings.backgroundColor;
+        ctx.fillRect(0, 0, width, height);
+    }
+
+    glyphs.forEach((g, i) => {
+        const col = i % COLS;
+        const row = Math.floor(i / COLS);
+        const x = col * CELL_SIZE;
+        const y = row * CELL_SIZE;
+
+        const glyphPath = g.glyph.getPath(0, 0, 48); 
+        const bbox = glyphPath.getBoundingBox();
+        const gW = bbox.x2 - bbox.x1;
+        const gH = bbox.y2 - bbox.y1;
+        const gX = x + (CELL_SIZE - gW) / 2 - bbox.x1;
+        const gY = y + (CELL_SIZE - gH) / 2 - bbox.y1; 
+
+        const path = g.glyph.getPath(gX, gY + 36, 48); 
+        path.fill = settings.color;
+        path.draw(ctx);
+
+        metaData[g.unicode ? `u${g.unicode.toString(16)}` : g.name] = {
+            x, y, w: CELL_SIZE, h: CELL_SIZE, index: g.index
+        };
+    });
+
+    return new Promise(resolve => {
+        canvas.toBlob(blob => { resolve({ blob, metaData }); }, 'image/png');
+    });
+};
+
+// --- FONT SUBSETTER (Smart Selection Logic) ---
+export const createSubset = (originalFont, selectedIndices, allVisibleGlyphs = []) => {
+    const glyphsToKeep = [];
+    
+    // Always include .notdef (index 0)
+    glyphsToKeep.push(originalFont.glyphs.get(0));
+
+    // Determine Source: Selection OR All Visible
+    let sourceIndices = new Set();
+    
+    if (selectedIndices.size > 0) {
+        sourceIndices = selectedIndices;
+    } else {
+        // Fallback: Use all glyphs currently in the filtered list
+        allVisibleGlyphs.forEach(g => sourceIndices.add(g.index));
+    }
+
+    sourceIndices.forEach(idx => {
+        if (idx !== 0) glyphsToKeep.push(originalFont.glyphs.get(idx));
+    });
+
+    // Create new font object
+    const newFont = new opentype.Font({
+        familyName: originalFont.names.fontFamily.en + " Subset",
+        styleName: originalFont.names.fontSubfamily.en,
+        unitsPerEm: originalFont.unitsPerEm,
+        ascender: originalFont.ascender,
+        descender: originalFont.descender,
+        glyphs: glyphsToKeep
+    });
+    
+    return newFont;
+};
+
+// --- CONSTANTS ---
 export const PRESETS = {
   custom: { label: 'Custom Dimensions', w: 100, h: 100 },
   android: { label: 'Android (24x24)', w: 24, h: 24 },
@@ -54,13 +129,14 @@ export const PRESETS = {
   large: { label: 'Large (512x512)', w: 512, h: 512 },
 };
 
-// UPDATED: Default is now Metrics, translateY is 0
 export const DEFAULT_SETTINGS = {
   scale: 0.85, padding: 10, translateX: 0, translateY: 0, rotate: 0, flipH: false, flipV: false,
   positioning: 'metrics', canvasWidth: 100, canvasHeight: 100, color: '#000000',
   strokeWidth: 1, 
   backgroundColor: 'transparent',
-  renderMode: 'fill'
+  renderMode: 'fill',
+  comparisonColor: '#FF0000', 
+  comparisonOpacity: 0.4      
 };
 
 export const LARGE_BLOCK_THRESHOLD = 1500; 
