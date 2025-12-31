@@ -50,13 +50,38 @@ export const SliderControl = ({ label, value, min, max, step, onChange, onAfterC
 
 export const AppLogo = () => (
   <div className="flex items-center gap-3">
-    <svg viewBox="0 0 100 100" className="w-10 h-10 shrink-0" xmlns="http://www.w3.org/2000/svg">
-      <path d="M16.9.4h66.3c8.9 0 16.1 7.3 16.1 16.3v66.7c0 9-7.2 16.3-16.1 16.3H16.9C8 99.6.7 92.4.7 83.4V16.6C.7 7.6 8 .4 16.9.4" fill="#4f46e5" />
-      <path fill="#fff" d="M65.5 54.4c-.4-1.6-2.9-9.2-8-16.9-.1-.1-.1-.1-.2-.1L34 31.2c-.4-.1-.8.4-.4.7l10 10.1c1.1-.6 2.6-.4 3.5.6.3.2.4.5.6.8.6 1.2.4 2.6-.6 3.5s-2.4 1.2-3.5.6c-.3-.2-.6-.3-.8-.6-1-1-1.1-2.4-.6-3.5l-10-10.1c-.3-.3-.9 0-.7.4L37.6 57c0 .1.1.2.1.2 7.2 4.9 15.3 7.6 16.9 8 .2 0 .3 0 .4-.1l10.3-10.3c.2-.1.2-.3.2-.4m-7.7 3.9h-2.1l-.4-1.2-.5-1.6-.2-.4h-4.9c-.1 0-.3.4-.4.9-.2.5-.4 1.1-.5 1.5l-.2.6h-1.1c-.6 0-1.1 0-1.1-.1s.5-1.4 1.1-3c3.6-9.9 3.5-9.6 3.7-9.5.1 0 .6.1 1.2.1.6 0 1.2 0 1.2.1.1.1 1.2 3.2 1.6 4.3s1.3 3.6 2.4 6.7c.3.8.5 1.4.5 1.5.2 0 0 .1-.2.1" />
-      <path fill="#fff" d="M53.2 50.1c-.4-1.1-.7-2-.8-2.1-.2-.1-.3.1-.8 1.7-.3.9-.6 1.9-.8 2.4s-.3.9-.2 1 .4.1.9.1H53c.5 0 .9 0 1-.1.1 0 .1-.3-.1-.6 0-.2-.4-1.3-.7-2.4m18.1 7.6-2.2-2.2c-.5-.5-1.3-.5-1.8 0L55.8 67c-.5.5-.5 1.3 0 1.8L58 71c.5.5 1.3.5 1.9 0l11.5-11.5c.4-.5.4-1.3-.1-1.8" />
-      <path d="M18.7 18.7h62.5v62.5H18.7z" fill="none" stroke="#fff" strokeWidth="5.333" />
-      <path fill="#fff" d="M10.9 10.9h15.6v15.6H10.9zm0 62.5h15.6V89H10.9zm62.5 0H89V89H73.4zm0-62.5H89v15.6H73.4z" />
+    {/* Updated SVG Logo */}
+    <svg 
+      viewBox="0 0 100 100" 
+      className="w-10 h-10 shrink-0" 
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path 
+        d="M16.9.4h66.3c8.9 0 16.1 7.3 16.1 16.3v66.7c0 9-7.2 16.3-16.1 16.3H16.9C8 99.6.7 92.4.7 83.4V16.6C.7 7.6 8 .4 16.9.4" 
+        fill="#4f46e5" 
+      />
+      <path 
+        d="M18.7 18.7h62.5v62.5H18.7z" 
+        style={{ fill: 'none', stroke: '#fff', strokeWidth: '4.5' }} 
+      />
+      <path 
+        fill="#fff" 
+        d="M10.9 10.9h15.6v15.6H10.9zm0 62.5h15.6V89H10.9zm62.5 0H89V89H73.4zm0-62.5H89v15.6H73.4z" 
+      />
+      <path 
+        fill="#4f46e5" 
+        d="M14.3 76.8H23v8.7h-8.7zm0-62.5H23V23h-8.7zm62.5 0h8.7V23h-8.7zm0 62.5h8.7v8.7h-8.7z" 
+      />
+      <path 
+        fill="#fff" 
+        d="M50.9 31 40.2 60.4h-4.4l12.3-32.3h2.8zm8.3 17.5V52H41.1v-3.5zm.6 11.9L49.1 31l-.1-2.8h2.8l12.3 32.3h-4.3z" 
+      />
+      <path 
+        style={{ fill: 'none', stroke: '#fff', strokeWidth: '4', strokeLinecap: 'round', strokeLinejoin: 'round' }} 
+        d="M33.9 67.8h32.2" 
+      />
     </svg>
+
     <div className="font-bold text-lg tracking-tight text-gray-900 dark:text-white leading-tight whitespace-nowrap">
       <span className="block">GlyphForge</span>
       <span className="block text-sm font-normal opacity-80">Font Glyph Exporter</span>
