@@ -8,7 +8,6 @@ import opentype from 'opentype.js';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 
-// Import components
 import Sidebar from './components/Sidebar';
 import GlyphCard from './components/GlyphCard';
 import BlockSection from './components/BlockSection';
@@ -16,14 +15,12 @@ import PaginationControls from './components/PaginationControls';
 import TypeTester from './components/TypeTester';
 import { Button, AppLogo, ConfirmationModal } from './components/UIComponents';
 
-// Import Utils
 import { 
   cn, svgToPng, DEFAULT_SETTINGS, formatRange, 
   LARGE_BLOCK_THRESHOLD, LARGE_BLOCK_PAGE_SIZE, ERROR_VIEW_PAGE_SIZE,
   createSubset, generateCSS 
 } from './utils/utils';
 
-// ... (ExportOptionsModal keep same) ...
 const ExportOptionsModal = ({ isOpen, title, onClose, onConfirm, children }) => {
     if (!isOpen) return null;
     return (
@@ -175,7 +172,6 @@ export default function GlyphScopeX() {
   const handleRedo = useCallback(() => { if (historyIndex < history.length - 1) { const next = history[historyIndex + 1]; setGlobalSettings(next.globalSettings); setOverrides(next.overrides); setHistoryIndex(historyIndex + 1); } }, [history, historyIndex]);
   const handleReset = () => { setConfirmState({ isOpen: true, title: "Reset", message: "Reset all settings?", isDangerous: true, onConfirm: () => { setGlobalSettings(DEFAULT_SETTINGS); setOverrides({}); saveToHistory(DEFAULT_SETTINGS, {}); closeConfirm(); } }); };
 
-  // --- UPDATED SEARCH LOGIC ---
   const filteredGlyphs = useMemo(() => {
     let result = glyphs;
     const term = searchTerm.trim();
@@ -483,7 +479,6 @@ export default function GlyphScopeX() {
     return [];
   }, [font, viewMode, activeBlock, paginatedBlocks, currentPage, glyphs, errorIndices]);
 
-  // CSS Logic
   const handleCSSClick = () => setCssModalOpen(true);
   const generatedCSS = useMemo(() => {
       if(!font) return '';
@@ -491,7 +486,6 @@ export default function GlyphScopeX() {
   }, [font]);
   const executeCSSDownload = () => { const blob = new Blob([generatedCSS], {type: "text/css;charset=utf-8"}); saveAs(blob, `${font.names.fontFamily?.en || 'font'}.css`); };
 
-  // --- NEW: AUTO CANVAS RESIZE LOGIC ---
   const handleAutoCanvasResize = (mode) => {
       if (!font) return;
       const targets = selectedIndices.size > 0 ? glyphs.filter(g => selectedIndices.has(g.index)) : glyphs; 
@@ -537,7 +531,6 @@ export default function GlyphScopeX() {
       }
   };
 
-  // --- KEYBOARD SHORTCUTS LOGIC (UPDATED) ---
   useEffect(() => {
       const handleKeyDown = (e) => {
         if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') { if (e.key === 'Escape') e.target.blur(); return; }

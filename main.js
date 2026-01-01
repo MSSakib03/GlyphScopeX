@@ -12,7 +12,6 @@ function createWindow() {
     }
   });
 
-  // যদি অ্যাপটি বিল্ড করা থাকে তবে ফাইল লোড করবে, নাহলে লোকাল সার্ভার
   if (app.isPackaged) {
     win.loadFile(path.join(__dirname, 'dist/index.html'));
   } else {

@@ -1,5 +1,3 @@
-// src/blocks.js
-
 export const UNICODE_BLOCKS = [
   { start: 0x0000, end: 0x007F, name: "Basic Latin" },
   { start: 0x0080, end: 0x00FF, name: "Latin-1 Supplement" },

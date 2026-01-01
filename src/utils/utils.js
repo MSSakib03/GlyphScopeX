@@ -2,7 +2,6 @@ import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import opentype from 'opentype.js';
 
-// --- Utility ---
 export function cn(...inputs) { return twMerge(clsx(inputs)); }
 
 export const formatRange = (start, end) => {
@@ -40,7 +39,6 @@ export const svgToPng = (svgString, width, height, scaleFactor = 1) => {
   });
 };
 
-// --- SPRITE SHEET GENERATOR ---
 export const generateSpriteSheet = async (glyphs, settings, font) => {
     const CELL_SIZE = 64; 
     const COLS = Math.ceil(Math.sqrt(glyphs.length));
@@ -86,7 +84,6 @@ export const generateSpriteSheet = async (glyphs, settings, font) => {
     });
 };
 
-// --- FONT SUBSETTER ---
 export const createSubset = (originalFont, selectedIndices, allVisibleGlyphs = []) => {
     const glyphsToKeep = [];
     
@@ -117,7 +114,6 @@ export const createSubset = (originalFont, selectedIndices, allVisibleGlyphs = [
     return newFont;
 };
 
-// --- CSS GENERATOR ---
 export const generateCSS = (font, fileName) => {
     if (!font || !font.names) return '';
     
@@ -155,8 +151,6 @@ export const generateCSS = (font, fileName) => {
 }`;
 };
 
-
-// --- CONSTANTS ---
 export const PRESETS = {
   custom: { label: 'Custom Dimensions', w: 100, h: 100 },
   android: { label: 'Android (24x24)', w: 24, h: 24 },

@@ -7,7 +7,7 @@ const GlyphCard = React.memo(({ g, comparisonG, settings, isSelected, isError, t
   const dragStartRef = useRef({ x: 0, y: 0, initialTx: 0, initialTy: 0 });
   const hasMovedRef = useRef(false);
   const [copied, setCopied] = useState(false); 
-  const [showSmartGuides, setShowSmartGuides] = useState({ x: false, y: false }); // NEW: Smart Guides State
+  const [showSmartGuides, setShowSmartGuides] = useState({ x: false, y: false }); 
 
   const strokeWidth = Math.abs(settings.strokeWidth - 1) * 2; 
   const strokeColor = settings.strokeWidth < 1 ? settings.backgroundColor : settings.color;
@@ -61,7 +61,6 @@ const GlyphCard = React.memo(({ g, comparisonG, settings, isSelected, isError, t
     }
 
     const finalPath = glyphData.glyph.getPath(xPos, yPos, scaledFontSize);
-    // NEW: Return bbox center for smart guides
     const finalBbox = finalPath.getBoundingBox();
     const centerX = (finalBbox.x1 + finalBbox.x2) / 2;
     const centerY = (finalBbox.y1 + finalBbox.y2) / 2;
@@ -113,7 +112,6 @@ const GlyphCard = React.memo(({ g, comparisonG, settings, isSelected, isError, t
     const dy = e.clientY - dragStartRef.current.y;
     if (Math.abs(dx) > 3 || Math.abs(dy) > 3) hasMovedRef.current = true;
     
-    // --- SMART GUIDES LOGIC ---
     if (pathData) {
        const THRESHOLD = 2;
        const isCenteredX = Math.abs(pathData.centerX - cx) < THRESHOLD;
