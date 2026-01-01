@@ -3,7 +3,8 @@ import {
   PanelLeftClose, PanelLeftOpen, Upload, FileType, X, Download, Layers, 
   Baseline, Maximize, MoveHorizontal, MoveVertical, Palette, 
   FileSignature, Grid, LayoutGrid, Eye, Trash2, CheckSquare, Square,
-  Focus, ArrowUpDown, SplitSquareHorizontal, Ruler, Keyboard, FileArchive, ImageIcon // New icons
+  Focus, ArrowUpDown, SplitSquareHorizontal, Ruler, Keyboard, FileArchive, ImageIcon, 
+  FileCode, Scaling // Scaling Icon Added
 } from 'lucide-react';
 import { cn, PRESETS, formatRange } from '../utils/utils';
 import { Button, SliderControl, AppLogo } from './UIComponents';
@@ -16,9 +17,10 @@ const Sidebar = ({
   blocks, activeBlock, setActiveBlock, paginatedBlocks, currentPage, setCurrentPage, setViewMode, 
   errorIndices, handleDownload, deleteBlock, selectedIndices, setSelectedIndices,
   compareFontIndex, setCompareFontIndex,
-  // New Props
   showGuidelines, setShowGuidelines,
-  handleTypeTester, handleSubsetExport, handleSpriteExport
+  handleTypeTester, handleSubsetExport, handleSpriteExport,
+  handleCSSExport,
+  handleAutoCanvasResize // NEW PROP
 }) => {
   return (
     <aside className={cn("bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 flex flex-col shrink-0 z-20 shadow-xl overflow-hidden transition-all duration-300 ease-in-out", isSidebarOpen ? "w-80" : "w-[60px]")}>
@@ -30,6 +32,7 @@ const Sidebar = ({
       </div>
 
       <div className={cn("flex-1 overflow-y-auto custom-scrollbar", !isSidebarOpen && "hidden")}>
+        {/* ... Upload Section (Keep existing code) ... */}
         <div className="p-4 border-b border-gray-100 dark:border-gray-800">
             {fontList.length === 0 ? (
               <label className="border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-xl p-4 flex flex-col items-center justify-center cursor-pointer hover:border-violet-400 hover:bg-violet-50 transition-all">
@@ -40,7 +43,6 @@ const Sidebar = ({
               </label>
             ) : (
               <div className="space-y-3">
-                 {/* ... Font List Code (Same as before) ... */}
                  <div className="flex items-center justify-between"><div className="text-xs font-bold text-gray-400 uppercase">Loaded Fonts</div><label className="text-[10px] text-violet-600 cursor-pointer hover:underline flex items-center gap-1"><Upload size={10}/> Add More<input type="file" className="hidden" accept=".ttf,.otf,.woff" multiple onChange={handleFileUpload} /></label></div>
                  <div className="space-y-2">
                     {fontList.map((f, idx) => (
@@ -66,27 +68,30 @@ const Sidebar = ({
         </div>
 
         <div className="p-4 space-y-6">
-          {/* --- NEW: TOOLS SECTION --- */}
+          {/* Tools & Export (Keep as is) */}
           {font && (
               <div className="space-y-3">
                  <label className="text-xs font-bold text-gray-400 uppercase flex items-center gap-2">Tools & Export</label>
+                 <button onClick={handleTypeTester} className="w-full flex items-center justify-center gap-2 p-3 bg-violet-50 dark:bg-violet-900/20 border border-violet-100 dark:border-violet-800 rounded-lg hover:bg-violet-100 transition-colors text-violet-700 dark:text-violet-300 font-bold text-sm shadow-sm" title="Live Type Tester">
+                    <Keyboard size={18}/> Type Tester
+                 </button>
                  <div className="grid grid-cols-3 gap-2">
-                     <button onClick={handleTypeTester} className="flex flex-col items-center justify-center gap-1 p-2 bg-violet-50 dark:bg-violet-900/20 border border-violet-100 dark:border-violet-800 rounded-lg hover:bg-violet-100 transition-colors text-violet-700 dark:text-violet-300" title="Live Type Tester">
-                        <Keyboard size={16}/> <span className="text-[9px] font-bold">Type</span>
-                     </button>
                      <button onClick={handleSubsetExport} className="flex flex-col items-center justify-center gap-1 p-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-lg hover:bg-blue-100 transition-colors text-blue-700 dark:text-blue-300" title="Export Subset Font (.ttf)">
-                        <FileArchive size={16}/> <span className="text-[9px] font-bold">Subset</span>
+                        <FileArchive size={18}/> <span className="text-[10px] font-bold">Subset</span>
+                     </button>
+                     <button onClick={handleCSSExport} className="flex flex-col items-center justify-center gap-1 p-2 bg-pink-50 dark:bg-pink-900/20 border border-pink-100 dark:border-pink-800 rounded-lg hover:bg-pink-100 transition-colors text-pink-700 dark:text-pink-300" title="Get CSS Snippet">
+                        <FileCode size={18}/> <span className="text-[10px] font-bold">Get CSS</span>
                      </button>
                      <button onClick={handleSpriteExport} className="flex flex-col items-center justify-center gap-1 p-2 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800 rounded-lg hover:bg-emerald-100 transition-colors text-emerald-700 dark:text-emerald-300" title="Generate Sprite Sheet">
-                        <ImageIcon size={16}/> <span className="text-[9px] font-bold">Sprite</span>
+                        <ImageIcon size={18}/> <span className="text-[10px] font-bold">Sprite</span>
                      </button>
                  </div>
               </div>
           )}
 
-          {/* Existing Export Settings */}
+          {/* Export Settings (Keep as is) */}
           <div className="space-y-3">
-             <label className="text-xs font-bold text-gray-400 uppercase flex items-center gap-2"><Download size={12}/> File Settings</label>
+             <label className="text-xs font-bold text-gray-400 uppercase flex items-center gap-2"><Download size={12}/> Glyph Export Settings</label>
              <div className="grid grid-cols-2 gap-2">
                <div className="col-span-2 grid grid-cols-3 gap-1 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg">
                  {['svg', 'png', 'both'].map(fmt => (
@@ -99,13 +104,29 @@ const Sidebar = ({
              </div>
           </div>
 
-          <div className="space-y-3">
-             {/* ... Canvas settings (same as before) ... */}
+          {/* --- UPDATED CANVAS SECTION --- */}
+           <div className="space-y-3">
              <label className="text-xs font-bold text-gray-400 uppercase flex items-center gap-2"><Layers size={12}/> Canvas</label>
              <select value={preset} onChange={(e) => { setPreset(e.target.value); if(e.target.value!=='custom'){ updateSetting('canvasWidth', PRESETS[e.target.value].w); updateSetting('canvasHeight', PRESETS[e.target.value].h); commitSettingChange(); }}} className="w-full p-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-xs outline-none">
                {Object.entries(PRESETS).map(([key, val]) => (<option key={key} value={key}>{val.label}</option>))}
             </select>
-            <div className="grid grid-cols-2 gap-3">
+            
+            {/* Auto Adjust Canvas Feature */}
+            <div className="pt-2 border-t border-dashed border-gray-200 dark:border-gray-700">
+                <label className="text-[10px] font-bold text-gray-500 uppercase mb-2 flex items-center gap-1">
+                    <Scaling size={10} /> Auto Adjust
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                    <Button variant="outline" size="xs" onClick={() => handleAutoCanvasResize('max')} title="Adjust width & height based on maximum glyph size">
+                        Max Size
+                    </Button>
+                    <Button variant="outline" size="xs" onClick={() => handleAutoCanvasResize('metrics')} title="Adjust height based on Ascender/Descender">
+                        Font Metrics
+                    </Button>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 mt-2">
                <div className="space-y-1"><label className="text-[10px] text-gray-500">W</label><input type="number" value={currentSettings.canvasWidth} onChange={(e)=>updateSetting('canvasWidth', Number(e.target.value))} className="w-full p-1.5 text-xs bg-gray-50 dark:bg-gray-800 border dark:border-gray-700 rounded"/></div>
                <div className="space-y-1"><label className="text-[10px] text-gray-500">H</label><input type="number" value={currentSettings.canvasHeight} onChange={(e)=>updateSetting('canvasHeight', Number(e.target.value))} className="w-full p-1.5 text-xs bg-gray-50 dark:bg-gray-800 border dark:border-gray-700 rounded"/></div>
             </div>
@@ -113,20 +134,17 @@ const Sidebar = ({
 
           <div className="space-y-3">
             <label className="text-xs font-bold text-gray-400 uppercase">Adjustments</label>
-            
-            {/* Guidelines Toggle */}
             <button onClick={() => setShowGuidelines(!showGuidelines)} className={cn("w-full mb-2 flex items-center justify-between p-2 rounded-lg border text-xs font-medium transition-all", showGuidelines ? "bg-violet-50 border-violet-200 text-violet-700 dark:bg-violet-900/30 dark:border-violet-700" : "bg-white border-gray-200 text-gray-600 dark:bg-gray-800 dark:border-gray-700")}>
-                <span className="flex items-center gap-2"><Ruler size={14}/> View Font Metricss</span>
+                <span className="flex items-center gap-2"><Ruler size={14}/> View Font Metrics</span>
                 <span className={cn("w-8 h-4 rounded-full relative transition-colors", showGuidelines ? "bg-violet-500" : "bg-gray-300")}>
                     <span className={cn("absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all", showGuidelines ? "left-4.5" : "left-0.5")}></span>
                 </span>
             </button>
-
-            {/* ... Rest of adjustments (Base/Center/Metrics buttons, Sliders) ... */}
+            {/* ... Keep the rest of Adjustments ... */}
             <div className="flex bg-gray-100 dark:bg-gray-800 p-1 rounded-lg">
-               <button onClick={() => { updateSetting('positioning', 'baseline'); updateSetting('translateY', 10); commitSettingChange(); }} title="Relative Baseline (Sets Y to 10)" className={cn("flex-1 text-xs py-1 rounded flex items-center justify-center gap-1", currentSettings.positioning === 'baseline' ? "bg-white dark:bg-gray-700 shadow-sm text-violet-600" : "text-gray-500")}><Baseline size={14} /> Base</button>
-               <button onClick={() => { updateSetting('positioning', 'center'); updateSetting('translateY', 0); commitSettingChange(); }} title="Geometric Center (Sets Y to 0)" className={cn("flex-1 text-xs py-1 rounded flex items-center justify-center gap-1", currentSettings.positioning === 'center' ? "bg-white dark:bg-gray-700 shadow-sm text-violet-600" : "text-gray-500")}><Focus size={14} /> Center</button>
-               <button onClick={() => { updateSetting('positioning', 'metrics'); updateSetting('translateY', 0); commitSettingChange(); }} title="Use Font Metrics (Sets Y to 0)" className={cn("flex-1 text-xs py-1 rounded flex items-center justify-center gap-1", currentSettings.positioning === 'metrics' ? "bg-white dark:bg-gray-700 shadow-sm text-violet-600" : "text-gray-500")}><ArrowUpDown size={14} /> Metrics</button>
+               <button onClick={() => { updateSetting('positioning', 'baseline'); updateSetting('translateY', 10); commitSettingChange(); }} className={cn("flex-1 text-xs py-1 rounded flex items-center justify-center gap-1", currentSettings.positioning === 'baseline' ? "bg-white dark:bg-gray-700 shadow-sm text-violet-600" : "text-gray-500")}><Baseline size={14} /> Base</button>
+               <button onClick={() => { updateSetting('positioning', 'center'); updateSetting('translateY', 0); commitSettingChange(); }} className={cn("flex-1 text-xs py-1 rounded flex items-center justify-center gap-1", currentSettings.positioning === 'center' ? "bg-white dark:bg-gray-700 shadow-sm text-violet-600" : "text-gray-500")}><Focus size={14} /> Center</button>
+               <button onClick={() => { updateSetting('positioning', 'metrics'); updateSetting('translateY', 0); commitSettingChange(); }} className={cn("flex-1 text-xs py-1 rounded flex items-center justify-center gap-1", currentSettings.positioning === 'metrics' ? "bg-white dark:bg-gray-700 shadow-sm text-violet-600" : "text-gray-500")}><ArrowUpDown size={14} /> Metrics</button>
             </div>
             
             <Button variant="outline" size="sm" onClick={performAutoFit} className="w-full text-violet-600 border-violet-200 hover:bg-violet-50" title="Auto Fit & Center"><Maximize size={14}/> Auto Fit & Center</Button>
@@ -141,7 +159,6 @@ const Sidebar = ({
             <div className="grid grid-cols-2 gap-2 mt-2"><Button variant="outline" size="sm" onClick={() => { updateSetting('flipH', !currentSettings.flipH); commitSettingChange(); }} className={currentSettings.flipH ? "bg-violet-50 border-violet-200 text-violet-700" : ""} title="Flip Horizontal"><MoveHorizontal size={14}/> Flip H</Button><Button variant="outline" size="sm" onClick={() => { updateSetting('flipV', !currentSettings.flipV); commitSettingChange(); }} className={currentSettings.flipV ? "bg-violet-50 border-violet-200 text-violet-700" : ""} title="Flip Vertical"><MoveVertical size={14}/> Flip V</Button></div>
             <SliderControl label="Rotate" value={currentSettings.rotate} min={0} max={360} step={1} unit="°" onChange={(v) => updateSetting('rotate', v)} onAfterChange={commitSettingChange} />
             
-            {/* ... Color/Style and Filename pattern sections remain same ... */}
             <div className="space-y-2 pt-2 border-t border-gray-100 dark:border-gray-800">
               <label className="text-xs font-bold text-gray-400 uppercase flex items-center gap-2"><Palette size={12}/> Appearance</label>
               <div className="flex items-center gap-2 mb-2"><div className="w-20 text-[10px] text-gray-500 font-semibold">Style</div><div className="flex-1 flex bg-gray-100 dark:bg-gray-800 p-0.5 rounded-lg">{['fill', 'outline', 'negative'].map(mode => (<button key={mode} onClick={() => { updateSetting('renderMode', mode); commitSettingChange(); }} className={cn("flex-1 text-[10px] py-1 rounded capitalize transition-all", currentSettings.renderMode === mode ? "bg-white dark:bg-gray-700 shadow-sm text-violet-600 font-bold" : "text-gray-500")}>{mode}</button>))}</div></div>
@@ -155,10 +172,9 @@ const Sidebar = ({
                {filterMode === 'all' && (<div className="space-y-1 animate-in slide-in-from-top-2"><label className="text-[9px] text-gray-500">For Ligatures/Non-Unicode</label><div className="flex items-center gap-2 p-1 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 border-l-4 border-l-violet-400"><input type="text" value={ligaturePattern} onChange={(e) => setLigaturePattern(e.target.value)} className="flex-1 p-1 bg-transparent text-xs font-mono focus:outline-none" placeholder="{name}" /></div></div>)}
                <div className="flex flex-wrap gap-1 text-[9px] text-gray-400"><span className="bg-gray-100 dark:bg-gray-800 px-1 rounded">{`{fontName}`}</span><span className="bg-gray-100 dark:bg-gray-800 px-1 rounded">{`{name}`}</span><span className="bg-gray-100 dark:bg-gray-800 px-1 rounded">{`{hex}`}</span><span className="bg-gray-100 dark:bg-gray-800 px-1 rounded">{`{index}`}</span></div>
             </div>
-
           </div>
 
-          {/* ... Block List (Same as before) ... */}
+          {/* ... Block List (Keep existing) ... */}
           {font && (
              <div className="space-y-3 pt-4 border-t border-gray-100 dark:border-gray-800">
                <div className="flex bg-gray-100 dark:bg-gray-800 p-1 rounded-lg mb-2"><button onClick={() => handleModeSwitch('unicode')} className={cn("flex-1 text-xs py-1.5 rounded flex items-center justify-center gap-1.5 font-medium transition-all", filterMode === 'unicode' ? "bg-white dark:bg-gray-700 shadow-sm text-violet-600" : "text-gray-500")}><Grid size={12}/> Unicode Only</button><button onClick={() => handleModeSwitch('all')} className={cn("flex-1 text-xs py-1.5 rounded flex items-center justify-center gap-1.5 font-medium transition-all", filterMode === 'all' ? "bg-white dark:bg-gray-700 shadow-sm text-violet-600" : "text-gray-500")}><LayoutGrid size={12}/> All (Ligatures)</button></div>

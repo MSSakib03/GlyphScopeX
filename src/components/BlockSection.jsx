@@ -6,7 +6,7 @@ import GlyphCard from './GlyphCard';
 
 const BlockSection = ({ 
     block, collapsedBlocks, setCollapsedBlocks, errorIndices, selectedIndices, setSelectedIndices, deleteBlock, handleDownload, setViewMode, setActiveBlock, getSettingsForGlyph, toggleSelection, handleUpdateGlyphPos, handleDragEnd, setCurrentPage, comparisonMap,
-    showGuidelines // New prop
+    showGuidelines, focusedGlyphIndex // focusedGlyphIndex received here
 }) => {
   const collapseKey = `${block.name}-${block.glyphs[0]?.index}`;
   const isCollapsed = collapsedBlocks.has(collapseKey);
@@ -46,7 +46,8 @@ const BlockSection = ({
                     toggleSelection={toggleSelection}
                     onUpdatePosition={handleUpdateGlyphPos}
                     onDragEnd={handleDragEnd}
-                    showGuidelines={showGuidelines} // Pass down
+                    showGuidelines={showGuidelines} 
+                    isFocused={focusedGlyphIndex === g.index} // Pass focused state correctly
                 />
               );
            })}

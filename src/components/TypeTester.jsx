@@ -1,16 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { AlignLeft, AlignCenter, AlignRight, Layers, CheckSquare, Square, SlidersHorizontal, MousePointer2, SplinePointer, Type, ArrowUp, ArrowDown, Download, AlertTriangle } from 'lucide-react';
+import { AlignLeft, AlignCenter, AlignRight, Layers, CheckSquare, Square, SlidersHorizontal, MousePointer2, SplinePointer, Type, ArrowUp, ArrowDown, Download, AlertTriangle, GripVertical } from 'lucide-react'; // GripVertical Added
 import { Button, SliderControl } from './UIComponents';
 import { saveAs } from 'file-saver';
 import opentype from 'opentype.js'; 
 
-// Helper to generate distinct colors
 const getAutoColor = (index) => {
     const colors = ['#FF0000', '#0000FF', '#008000', '#FFA500', '#800080', '#008080', '#FF00FF', '#A52A2A'];
     return colors[index % colors.length];
 };
 
-// Helper: Convert ArrayBuffer to Base64
 const arrayBufferToBase64 = (buffer) => {
     let binary = '';
     const bytes = new Uint8Array(buffer);
@@ -25,35 +23,27 @@ const TypeTester = ({ fontList, darkMode }) => {
     const [text, setText] = useState(""); 
     const [fontSize, setFontSize] = useState(48);
     const [align, setAlign] = useState('center');
-    
-    // Padding
     const [padH, setPadH] = useState(20);
     const [padV, setPadV] = useState(20);
-    
-    // Canvas & Fit Settings
     const [fitMode, setFitMode] = useState('together'); 
     const [manualCanvasW, setManualCanvasW] = useState(1000);
     const [manualCanvasH, setManualCanvasH] = useState(200);
-    
-    // Calculated Dimensions
     const [calcW, setCalcW] = useState(1000);
     const [calcH, setCalcH] = useState(200);
-
     const [textColor, setTextColor] = useState(darkMode ? '#FFFFFF' : '#000000');
     const [viewMode, setViewMode] = useState('list'); 
     const [exportTransparent, setExportTransparent] = useState(true);
-    
     const [svgExportType, setSvgExportType] = useState('text'); 
-
-    // Font Selection & Styles
     const [selectedFonts, setSelectedFonts] = useState(new Set(fontList.map((_, i) => i)));
     const [fontStyles, setFontStyles] = useState({});
-
-    // Layer Ordering
     const [layerOrder, setLayerOrder] = useState([]);
+    
+    // --- NEW: Drag State ---
+    const [draggedItem, setDraggedItem] = useState(null);
 
     const loadedFonts = useRef(new Set());
     const [isFontsReady, setIsFontsReady] = useState(false);
+    const canvasRefs = useRef({});
 
     useEffect(() => {
         setLayerOrder(fontList.map((_, i) => i));
@@ -80,7 +70,6 @@ const TypeTester = ({ fontList, darkMode }) => {
         loadFonts();
     }, [fontList]);
 
-    // Initialize Font Styles
     useEffect(() => {
         setFontStyles(prev => {
             const newStyles = { ...prev };
@@ -96,31 +85,6 @@ const TypeTester = ({ fontList, darkMode }) => {
         });
     }, [fontList]);
 
-    const canvasRefs = useRef({});
-
-    // Selection Handlers
-    const toggleFontSelection = (index) => {
-        const newSet = new Set(selectedFonts);
-        if (newSet.has(index)) newSet.delete(index);
-        else newSet.add(index);
-        setSelectedFonts(newSet);
-    };
-
-    const selectAll = () => setSelectedFonts(new Set(fontList.map((_, i) => i)));
-    const deselectAll = () => setSelectedFonts(new Set());
-
-    // Layer Reordering
-    const moveLayer = (indexInOrder, direction) => {
-        const newOrder = [...layerOrder];
-        if (direction === 'up' && indexInOrder < newOrder.length - 1) {
-            [newOrder[indexInOrder], newOrder[indexInOrder + 1]] = [newOrder[indexInOrder + 1], newOrder[indexInOrder]];
-        } else if (direction === 'down' && indexInOrder > 0) {
-            [newOrder[indexInOrder], newOrder[indexInOrder - 1]] = [newOrder[indexInOrder - 1], newOrder[indexInOrder]];
-        }
-        setLayerOrder(newOrder);
-    };
-
-    // Measure Text
     const measureTextDimensions = (ctx, fontIndex, currentText, currentSize) => {
         const uniqueName = `tt-font-${fontIndex}`;
         ctx.font = `${currentSize}px "${uniqueName}"`;
@@ -136,7 +100,6 @@ const TypeTester = ({ fontList, darkMode }) => {
         };
     };
 
-    // Auto Fit Logic
     useEffect(() => {
         if (!isFontsReady || fontList.length === 0) return;
 
@@ -164,11 +127,9 @@ const TypeTester = ({ fontList, darkMode }) => {
         }
     }, [text, fontSize, padH, padV, selectedFonts, fontList, fitMode, viewMode, isFontsReady]);
 
-    // DRAW FUNCTION
     const draw = () => {
         if (!isFontsReady) return;
 
-        // A. LIST VIEW
         if (viewMode === 'list') {
             fontList.forEach((f, i) => {
                 const canvas = canvasRefs.current[`list-${i}`];
@@ -213,7 +174,6 @@ const TypeTester = ({ fontList, darkMode }) => {
             });
         }
 
-        // B. OVERLAY VIEW
         if (viewMode === 'overlay') {
             const canvas = canvasRefs.current['overlay'];
             if (!canvas) return;
@@ -262,7 +222,6 @@ const TypeTester = ({ fontList, darkMode }) => {
         return () => clearTimeout(t);
     }, [text, fontSize, align, manualCanvasW, manualCanvasH, calcW, calcH, textColor, fontList, viewMode, fitMode, padH, padV, selectedFonts, fontStyles, isFontsReady, exportTransparent, layerOrder]);
 
-
     const updateFontStyle = (index, key, value) => {
         setFontStyles(prev => ({
             ...prev,
@@ -273,9 +232,41 @@ const TypeTester = ({ fontList, darkMode }) => {
         }));
     };
 
-    // DOWNLOAD HANDLER
+    // --- DRAG HANDLERS ---
+    const handleDragStart = (e, index) => {
+        setDraggedItem(index);
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setDragImage(e.currentTarget, 0, 0);
+    };
+
+    const handleDragOver = (e, index) => {
+        e.preventDefault();
+        const draggedIdx = draggedItem;
+        if (draggedIdx === null || draggedIdx === index) return;
+
+        const newOrder = [...layerOrder];
+        const draggedOrderIdx = newOrder.indexOf(draggedIdx);
+        const targetOrderIdx = newOrder.indexOf(index);
+        
+        newOrder.splice(draggedOrderIdx, 1);
+        newOrder.splice(targetOrderIdx, 0, draggedIdx);
+        
+        setLayerOrder(newOrder);
+    };
+
+    const handleDragEnd = () => {
+        setDraggedItem(null);
+    };
+
+    const toggleFontSelection = (index) => {
+        const newSet = new Set(selectedFonts);
+        if (newSet.has(index)) newSet.delete(index);
+        else newSet.add(index);
+        setSelectedFonts(newSet);
+    };
+    
     const handleDownload = (canvasId, fileName, format = 'png') => {
-        const canvas = canvasRefs.current[canvasId];
+         const canvas = canvasRefs.current[canvasId];
         if (!canvas) return;
 
         if (format === 'png') {
@@ -289,8 +280,6 @@ const TypeTester = ({ fontList, darkMode }) => {
             
             let svgContent = `<svg width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">`;
             
-            // 1. EMBED FONTS (CSS @font-face with Base64)
-            // Only embed fonts that are currently being exported to reduce size
             let css = "<defs><style>";
             const fontsToEmbed = new Set();
             if (canvasId === 'overlay') {
@@ -334,11 +323,9 @@ const TypeTester = ({ fontList, darkMode }) => {
                             const pathData = path.toPathData(2);
                             svgContent += `<path d="${pathData}" fill="${style.color}" fill-opacity="${style.opacity}" />`;
                         } catch (err) {
-                            // Fallback
                             svgContent += `<text x="${x}" y="${h/2}" font-family="${f.name}" font-size="${fontSize}px" fill="${style.color}" opacity="${style.opacity}" text-anchor="${align === 'center' ? 'middle' : (align === 'right' ? 'end' : 'start')}">${text}</text>`;
                         }
                     } else {
-                        // Text Mode (Now with Embedded Font!)
                         svgContent += `<text x="${x}" y="${h/2}" font-family="${f.name}" font-size="${fontSize}px" fill="${style.color}" opacity="${style.opacity}" text-anchor="${align === 'center' ? 'middle' : (align === 'right' ? 'end' : 'start')}">${text}</text>`;
                     }
                  });
@@ -363,15 +350,14 @@ const TypeTester = ({ fontList, darkMode }) => {
             svgContent += `</svg>`;
             
             const blob = new Blob([svgContent], {type: "image/svg+xml;charset=utf-8"});
-            // Filename hints
             const suffix = svgExportType === 'outline' ? '_shape' : '_embedded';
             saveAs(blob, fileName + suffix + '.svg');
         }
     };
 
+
     return (
         <div className="p-6 space-y-6 pb-32 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            {/* Controls Bar */}
             <div className="bg-white dark:bg-gray-800 p-5 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm space-y-5">
                 <textarea 
                     value={text} 
@@ -381,7 +367,6 @@ const TypeTester = ({ fontList, darkMode }) => {
                 />
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-6">
-                    {/* Size & Padding */}
                     <div className="lg:col-span-4 space-y-4 border-r border-gray-100 dark:border-gray-700 pr-4">
                         <SliderControl label="Font Size" value={fontSize} min={12} max={200} step={1} onChange={setFontSize} unit="px" />
                         <div className="grid grid-cols-2 gap-2">
@@ -390,7 +375,6 @@ const TypeTester = ({ fontList, darkMode }) => {
                         </div>
                     </div>
 
-                    {/* Canvas Settings */}
                     <div className="lg:col-span-4 space-y-3 border-r border-gray-100 dark:border-gray-700 pr-4">
                         <div className="flex justify-between items-center mb-1">
                             <label className="text-xs font-bold text-gray-500 uppercase">Canvas Size</label>
@@ -408,14 +392,12 @@ const TypeTester = ({ fontList, darkMode }) => {
                             <input type="number" disabled={fitMode !== 'none'} value={fitMode !== 'none' ? calcH : manualCanvasH} onChange={(e) => setManualCanvasH(Number(e.target.value))} className="w-full p-2 bg-gray-50 dark:bg-gray-900 border rounded text-sm disabled:opacity-60" placeholder="H"/>
                         </div>
                         
-                        {/* EXPORT OPTIONS SECTION */}
-                        <div className="mt-4 pt-3 border-t border-dashed border-gray-100 dark:border-gray-800">
+                         <div className="mt-4 pt-3 border-t border-dashed border-gray-100 dark:border-gray-800">
                              <div className="mb-2">
                                 <label className="text-xs font-bold text-gray-500 uppercase">Export Options</label>
                              </div>
                              
                              <div className="flex justify-between items-center">
-                                {/* Left: Transparent PNG */}
                                 <label className="flex items-center gap-2 cursor-pointer text-xs text-gray-600 dark:text-gray-400">
                                     <input 
                                         type="checkbox" 
@@ -426,7 +408,6 @@ const TypeTester = ({ fontList, darkMode }) => {
                                     Transparent PNG
                                 </label>
                                 
-                                {/* Right: SVG Mode */}
                                 <div className="flex items-center gap-2">
                                     <span className="text-xs text-gray-500">SVG Mode:</span>
                                     <div className="flex bg-gray-100 dark:bg-gray-900 p-0.5 rounded" title="SVG Export Type">
@@ -440,7 +421,6 @@ const TypeTester = ({ fontList, darkMode }) => {
                                 </div>
                              </div>
                              
-                             {/* WARNING MSG for Shape Mode */}
                              {svgExportType === 'outline' && (
                                 <div className="mt-2 flex items-start gap-1.5 text-[10px] text-amber-600 bg-amber-50 p-1.5 rounded border border-amber-100">
                                     <AlertTriangle size={12} className="mt-0.5"/>
@@ -450,7 +430,6 @@ const TypeTester = ({ fontList, darkMode }) => {
                         </div>
                     </div>
 
-                    {/* Appearance & Mode */}
                     <div className="lg:col-span-4 space-y-3">
                          <div className="flex justify-between items-center">
                             <label className="text-xs font-bold text-gray-500 uppercase">Appearance</label>
@@ -459,52 +438,55 @@ const TypeTester = ({ fontList, darkMode }) => {
                                 <button onClick={() => setAlign('center')} className={`p-1 rounded ${align==='center' ? 'bg-white dark:bg-gray-700 shadow text-violet-600' : 'text-gray-400'}`}><AlignCenter size={14}/></button>
                                 <button onClick={() => setAlign('right')} className={`p-1 rounded ${align==='right' ? 'bg-white dark:bg-gray-700 shadow text-violet-600' : 'text-gray-400'}`}><AlignRight size={14}/></button>
                              </div>
-                         </div>
-                         
-                         {viewMode === 'list' && (
+                          </div>
+                          
+                          {viewMode === 'list' && (
                              <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-900 p-1.5 rounded-lg border border-gray-200 dark:border-gray-700">
                                  <input type="color" value={textColor} onChange={(e) => setTextColor(e.target.value)} className="h-6 w-6 rounded cursor-pointer border-none bg-transparent"/>
                                  <span className="text-xs text-gray-500 font-mono">Base Color</span>
                              </div>
-                         )}
+                          )}
 
-                         <div className="flex gap-2 pt-1">
-                            <button onClick={() => setViewMode('list')} className={`flex-1 flex justify-center items-center gap-2 py-1.5 rounded-lg text-xs font-bold border ${viewMode==='list' ? 'bg-violet-50 border-violet-200 text-violet-700' : 'bg-white border-gray-200 text-gray-500'}`}>
-                                <AlignLeft size={14}/> List
-                            </button>
-                            <button onClick={() => setViewMode('overlay')} className={`flex-1 flex justify-center items-center gap-2 py-1.5 rounded-lg text-xs font-bold border ${viewMode==='overlay' ? 'bg-violet-50 border-violet-200 text-violet-700' : 'bg-white border-gray-200 text-gray-500'}`}>
-                                <Layers size={14}/> Overlay
-                            </button>
-                        </div>
+                          <div className="flex gap-2 pt-1">
+                             <button onClick={() => setViewMode('list')} className={`flex-1 flex justify-center items-center gap-2 py-1.5 rounded-lg text-xs font-bold border ${viewMode==='list' ? 'bg-violet-50 border-violet-200 text-violet-700' : 'bg-white border-gray-200 text-gray-500'}`}>
+                                 <AlignLeft size={14}/> List
+                             </button>
+                             <button onClick={() => setViewMode('overlay')} className={`flex-1 flex justify-center items-center gap-2 py-1.5 rounded-lg text-xs font-bold border ${viewMode==='overlay' ? 'bg-violet-50 border-violet-200 text-violet-700' : 'bg-white border-gray-200 text-gray-500'}`}>
+                                 <Layers size={14}/> Overlay
+                             </button>
+                         </div>
                     </div>
                 </div>
 
-                {/* Overlay Management */}
                 {viewMode === 'overlay' && (
                     <div className="pt-4 border-t border-dashed border-gray-200 dark:border-gray-700">
                          <div className="flex items-center justify-between mb-2">
                              <label className="text-[10px] font-bold text-gray-500 uppercase">Manage Layers & Styles</label>
-                             <span className="text-[10px] text-gray-400">Drag/Use arrows to reorder (Bottom = Top Layer)</span>
+                             <span className="text-[10px] text-gray-400">Drag items to reorder (Bottom = Top Layer)</span>
                          </div>
                          <div className="flex flex-col gap-2 max-h-52 overflow-y-auto pr-2 custom-scrollbar">
                              {[...layerOrder].reverse().map((originalIndex, visualIndex) => {
                                  const f = fontList[originalIndex];
                                  const isSelected = selectedFonts.has(originalIndex);
                                  const style = fontStyles[originalIndex] || { color: '#000000', opacity: 1 };
-                                 const actualIndexInOrder = layerOrder.length - 1 - visualIndex;
+                                 const isDragging = draggedItem === originalIndex;
 
                                  return (
-                                     <div key={originalIndex} className={`flex items-center gap-3 p-2 rounded-lg border transition-all ${isSelected ? 'bg-gray-50 dark:bg-gray-900 border-gray-200' : 'bg-transparent border-transparent opacity-60 hover:opacity-100'}`}>
+                                     <div 
+                                        key={originalIndex} 
+                                        draggable="true"
+                                        onDragStart={(e) => handleDragStart(e, originalIndex)}
+                                        onDragOver={(e) => handleDragOver(e, originalIndex)}
+                                        onDragEnd={handleDragEnd}
+                                        className={`flex items-center gap-3 p-2 rounded-lg border transition-all cursor-move select-none ${isSelected ? 'bg-gray-50 dark:bg-gray-900 border-gray-200' : 'bg-transparent border-transparent opacity-60 hover:opacity-100'} ${isDragging ? 'opacity-50 ring-2 ring-violet-400' : ''}`}
+                                     >
+                                         <GripVertical size={14} className="text-gray-300 cursor-grab active:cursor-grabbing"/>
                                          <input 
                                              type="checkbox" 
                                              checked={isSelected} 
                                              onChange={() => toggleFontSelection(originalIndex)}
                                              className="rounded text-violet-600 h-4 w-4"
                                          />
-                                         <div className="flex flex-col">
-                                             <button onClick={() => moveLayer(actualIndexInOrder, 'up')} disabled={actualIndexInOrder === layerOrder.length - 1} className="text-gray-400 hover:text-violet-600 disabled:opacity-20"><ArrowUp size={10}/></button>
-                                             <button onClick={() => moveLayer(actualIndexInOrder, 'down')} disabled={actualIndexInOrder === 0} className="text-gray-400 hover:text-violet-600 disabled:opacity-20"><ArrowDown size={10}/></button>
-                                         </div>
                                          <span className="text-xs font-bold w-24 truncate" title={f.name}>{f.name}</span>
                                          <div className={`flex items-center gap-3 flex-1 justify-end transition-opacity ${isSelected ? 'opacity-100' : 'opacity-20 pointer-events-none'}`}>
                                              <div className="w-6 h-6 rounded-full overflow-hidden border border-gray-200 cursor-pointer relative group">
@@ -534,7 +516,6 @@ const TypeTester = ({ fontList, darkMode }) => {
                 )}
             </div>
 
-            {/* PREVIEW AREA */}
             <div className="space-y-6">
                 {!isFontsReady && <div className="text-center py-10 text-gray-400 animate-pulse">Loading Font Engines...</div>}
 
@@ -548,7 +529,6 @@ const TypeTester = ({ fontList, darkMode }) => {
                                     </button>
                                     <span className="font-bold text-sm text-gray-700 dark:text-gray-300 select-none">{f.name}</span>
                                 </div>
-                                {/* DOWNLOAD BUTTONS IN LIST VIEW TITLE BAR */}
                                 <div className="flex gap-2">
                                     <Button variant="ghost" size="xs" onClick={() => handleDownload(`list-${idx}`, f.name, 'png')} className="text-xs">PNG</Button>
                                     <Button variant="ghost" size="xs" onClick={() => handleDownload(`list-${idx}`, f.name, 'svg')} className="text-xs">SVG</Button>

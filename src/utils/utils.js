@@ -40,7 +40,7 @@ export const svgToPng = (svgString, width, height, scaleFactor = 1) => {
   });
 };
 
-// --- SPRITE SHEET GENERATOR (Smart Selection Logic) ---
+// --- SPRITE SHEET GENERATOR ---
 export const generateSpriteSheet = async (glyphs, settings, font) => {
     const CELL_SIZE = 64; 
     const COLS = Math.ceil(Math.sqrt(glyphs.length));
@@ -86,20 +86,18 @@ export const generateSpriteSheet = async (glyphs, settings, font) => {
     });
 };
 
-// --- FONT SUBSETTER (Smart Selection Logic) ---
+// --- FONT SUBSETTER ---
 export const createSubset = (originalFont, selectedIndices, allVisibleGlyphs = []) => {
     const glyphsToKeep = [];
     
     // Always include .notdef (index 0)
     glyphsToKeep.push(originalFont.glyphs.get(0));
 
-    // Determine Source: Selection OR All Visible
     let sourceIndices = new Set();
     
     if (selectedIndices.size > 0) {
         sourceIndices = selectedIndices;
     } else {
-        // Fallback: Use all glyphs currently in the filtered list
         allVisibleGlyphs.forEach(g => sourceIndices.add(g.index));
     }
 
@@ -107,7 +105,6 @@ export const createSubset = (originalFont, selectedIndices, allVisibleGlyphs = [
         if (idx !== 0) glyphsToKeep.push(originalFont.glyphs.get(idx));
     });
 
-    // Create new font object
     const newFont = new opentype.Font({
         familyName: originalFont.names.fontFamily.en + " Subset",
         styleName: originalFont.names.fontSubfamily.en,
@@ -119,6 +116,45 @@ export const createSubset = (originalFont, selectedIndices, allVisibleGlyphs = [
     
     return newFont;
 };
+
+// --- CSS GENERATOR ---
+export const generateCSS = (font, fileName) => {
+    if (!font || !font.names) return '';
+    
+    const fontFamily = font.names.fontFamily?.en || 'CustomFont';
+    const subFamily = font.names.fontSubfamily?.en || 'Regular';
+    
+    // Create a safe class name (lowercase, hyphens only)
+    const className = (fontFamily + '-' + subFamily)
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)/g, '');
+
+    let fontWeight = 'normal';
+    let fontStyle = 'normal';
+
+    if (subFamily.toLowerCase().includes('bold')) fontWeight = 'bold';
+    if (subFamily.toLowerCase().includes('italic')) fontStyle = 'italic';
+    if (subFamily.toLowerCase().includes('light')) fontWeight = '300';
+    if (subFamily.toLowerCase().includes('medium')) fontWeight = '500';
+    
+    return `/* 1. Register the font */
+@font-face {
+  font-family: '${fontFamily}';
+  src: url('${fileName}.woff2') format('woff2'),
+       url('${fileName}.woff') format('woff'),
+       url('${fileName}.ttf') format('truetype');
+  font-weight: ${fontWeight};
+  font-style: ${fontStyle};
+  font-display: swap;
+}
+
+/* 2. Utility class to use the font */
+.font-${className} {
+  font-family: '${fontFamily}', sans-serif;
+}`;
+};
+
 
 // --- CONSTANTS ---
 export const PRESETS = {
