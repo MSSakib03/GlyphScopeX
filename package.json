@@ -1,7 +1,7 @@
 {
   "name": "GlyphScopeX",
-  "version": "1.0.1",
-  "description": "A powerful web tool to extract and export font glyphs as SVG or PNG images.",
+  "version": "1.2.0",
+  "description": "A powerful tool to extract font glyphs as SVG/PNG, generate webfont CSS, create subsets, and build sprite sheets.",
   "main": "main.js",
   "author": "MS Sakib",
   "license": "GPL-3.0-or-later",
@@ -50,6 +50,7 @@
     },
     "win": {
       "target": [
+        "nsis",
         "portable"
       ],
       "icon": "favicon.ico"
